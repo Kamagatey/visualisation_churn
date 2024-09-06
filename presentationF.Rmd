@@ -1,0 +1,475 @@
+---
+title: "ANALYSE DES DONNEES CLIENTS ET FIDELITE BANCAIRE"
+author: 
+- name: "SORO DOBA ISSIAKA"
+  phone: "05-55-39-97-80"
+- name: "KAMAGATE YOUSSOUF"
+- name: "CROLEY MARIE COLOMBE AUDREY"
+  affiliation: "Data scientist"
+lang: fr
+date: "`r Sys.Date()`"
+geometry: "margin=2cm"
+number-sections: true
+output: 
+      rmdformats::readthedown:
+      #:downcute: 
+      #readthedown, html_clean,html_docco,material,robobook,lockdown,downcute #https://github.com/juba/rmdformats
+      self_contained: true
+      #thumbnails: true
+      lightbox: true 
+      gallery: false
+      highlight: tango
+      use_bookdown: TRUE
+      embed_fonts: true
+      css: ["style-1.css", "style-2.css"]
+      includes:
+        in_header: "header.html"
+     # number_sections: true
+---
+ 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+# les packages
+library(tidyverse)
+library(rmdformats)
+library(lubridate)
+library(forecast)
+library(kableExtra)
+library(dplyr)
+library(TSstudio)
+library(tseries)
+library(dygraphs)
+library(tseries)
+library(jpeg)
+library(survival)
+library(readr)
+library(plotly)
+library(knitr)
+library(corrplot)
+library(DT)
+```
+
+
+```{css toc-content, echo = FALSE}
+ TOC {
+  right: 200px;
+  margin: 5px 0px 25px 0px;
+}
+
+.main-container {
+    margin-left: 10px;
+}
+
+p {
+  font-size:  16px;
+    line-height : 2em;  
+}
+
+h1 {
+  color: purple;
+  font-size:  18px;
+    line-height : 2em;  
+}
+
+h2 {
+  color:blues9;
+  font-size:  15px;
+    line-height : 2em;  
+}
+
+h3,h4{
+  color:red;
+  font-size:  12px;
+}
+
+.toggle-button {
+  background-color: #007BFF;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  margin: 10px 2px;
+  cursor: pointer;
+}
+
+.hidden-code {
+  display: none;
+}
+
+  
+```
+
+# Agenda de la Présentation :
+
+## 1. Introduction et Contexte
+
+- Présentation des objectifs de l'analyse
+- Description du jeu de données
+
+## 2. Visualisations Clés
+
+- Distribution de la variable "Exited"
+- Analyse par pays de résidence et genre
+_ Analyse des variables démographiques (âge, score de crédit)
+- Analyse de l'engagement des clients et de l'utilisation des produits bancaires
+- arbre de décision
+
+## 3. Interprétation des Résultats
+
+- Identification des facteurs clés influençant la fidélité des clients
+- Insights tirés des visualisations
+
+## 4. Recommandations Stratégiques
+
+- Actions suggérées pour améliorer la fidélité des clients
+- Stratégies d'engagement et de satisfaction client
+
+## 5. Conclusion
+
+- Résumé des points principaux
+- Perspectives et prochaines étapes
+
+\newpage
+
+# 1. Introduction et Contexte
+
+- **Introduction**
+
+Bienvenue à cette présentation consacrée à l'analyse des données clients d'une banque. Notre objectif aujourd'hui est de comprendre les facteurs qui influencent la fidélité de nos clients et d'identifier les raisons pour lesquelles certains choisissent de quitter notre établissement. Grâce à une analyse approfondie des données, nous allons explorer les caractéristiques démographiques, les comportements financiers et les habitudes d'utilisation de nos produits bancaires, afin de tirer des conclusions pertinentes et de formuler des recommandations stratégiques pour améliorer la rétention de nos clients.
+
+- **Contexte de l'analyse** :
+
+Notre analyse repose sur un ensemble de données détaillant les informations de nos clients, incluant des variables telles que l'âge, le sexe, le score de crédit, le pays de résidence, le solde des comptes, le nombre de produits bancaires détenus, ainsi que des indicateurs de fidélité tels que la possession de cartes de crédit et l'engagement des membres. 
+
+```{r}
+library(readr)
+# Importation des données 
+data <- read.csv("Projet_Visualisation_données.csv")
+datatable(data)
+```
+
+Ce jeu de données contient les colonnes suivantes :
+
+- **RowNumber** : Numéro de la ligne.
+
+- **CustomerId** : Identifiant unique du client.
+
+- **Surname** : Nom de famille du client.
+
+- **CreditScore** : Score de crédit du client.
+
+- **Geography** : Pays de résidence du client.
+
+- **Gender** : Sexe du client.
+
+- **Age** : Âge du client.
+
+- **Tenure** : Ancienneté du client en années.
+
+- **Balance** : Solde du compte bancaire du client.
+
+- **NumOfProducts** : Nombre de produits bancaires possédés par le client.
+
+- **HasCrCard** : Indique si le client possède une carte de crédit (1 pour oui, 0 pour non).
+
+- **IsActiveMember** : Indique si le client est un membre actif (1 pour oui, 0 pour non).
+
+- **EstimatedSalary** : Salaire estimé du client.
+
+- **Exited** : Indique si le client a quitté la banque (1 pour oui, 0 pour non)
+
+En exploitant ces données, nous pourrons identifier des patterns significatifs et formuler des recommandations pratiques pour améliorer la fidélité des clients et optimiser les offres de produits bancaires.
+**L'objectif principal est de détecter les tendances et les corrélations entre ces variables et le taux de départ des clients (variable "Exited").**
+
+# 2. Visualisations Clés
+
+```{r}
+# Conversions des variables en types approprié 
+fac=c("CustomerId","Surname","Geography","Gender","HasCrCard","IsActiveMember","Exited")
+for (var in fac){
+  data[[var]]=as.factor(data[[var]])
+}
+num=c("Balance","EstimatedSalary")
+for (var in num){
+  data[[var]]=as.numeric(data[[var]])
+}
+int=c("CreditScore","Age","Tenure","NumOfProducts")
+for (var in int){
+  data[[var]]=as.integer(data[[var]])
+}
+```
+
+```{r}
+# Calcul des pourcentages
+# Fonction pour calculer les pourcentages
+calculate_percentages <- function(df, variable) {
+  df %>%
+    group_by({{ variable }}, Exited) %>%
+    summarise(count = n()) %>%
+    mutate(percent = count / sum(count) * 100) %>%
+    ungroup()
+      }
+```
+
+## 2.1 Histogramme de la variable Exited
+
+```{r}
+exited_percent <- data %>%
+  group_by(Exited) %>%
+  summarise(count = n()) %>%
+  mutate(percent = count / sum(count) * 100)
+
+plot_ly(exited_percent, x = ~Exited, y = ~percent, type = 'bar', 
+              marker = list(color = "darkred"), 
+              text = ~paste0("Count: ", count, "<br>Percent: ", round(percent, 2), '%'), 
+              textposition = 'auto') %>%
+  layout(title = "Pourcentage de Exited",
+         xaxis = list(title = "Exited"),
+         yaxis = list(title = "Pourcentage"))
+```
+- **Taux de rétention élevé :** Le pourcentage élevé de clients restant fidèles à la banque (79,63%) suggère un taux de rétention relativement important. Cela peut être le signe d'une bonne satisfaction client, de produits et services compétitifs, ou encore d'une relation solide établie avec la clientèle.
+- **Taux de churn (résiliation) modéré :** Le taux de churn, bien que présent, semble être modéré (20,37%). Cela indique qu'un certain nombre de clients ont décidé de mettre fin à leur relation avec la banque.
+
+
+Malgré un taux de rétention élevé, il est crucial d'analyser plus en détail les raisons qui ont poussé les 20,37% des clients à partir. Une étude approfondie de ces départs pourrait permettre d'identifier des pistes d'amélioration pour réduire le taux de churn à l'avenir.
+
+
+
+## 2.2 Analyse par pays de résidence et genre
+
+- Analyse par pays de résidence
+
+```{r}
+# Diagramme à barres empilées interactif pour Exited par Geography
+geo_percent <- calculate_percentages(data, Geography)
+
+plot_ly(geo_percent, x = ~Geography, y = ~percent, color = ~Exited, type = 'bar', 
+              text = ~paste0("Total: ", count, "<br>Pourcentage: ", round(percent, 2), '%'), 
+              textposition = 'auto') %>%
+  layout(barmode = 'stack',
+         title = "Pourcentage de Exited par Geography",
+         xaxis = list(title = "Geography"),
+         yaxis = list(title = "Pourcentage"),
+         legend = list(title = list(text = "Exited")))
+
+```
+Les taux de churn en France et en Espagne(16%) sont relativement similaires, et inférieur à celui de l'Allemagne(32%). Des analyses plus approfondies pourraient être nécessaires pour comprendre si ces différences sont statistiquement significatives et si elles sont liées à des facteurs culturels, économiques ou liés aux produits et services offerts.
+
+
+
+- Analyse par genre
+
+
+```{r}
+# Convertir les variables catégorielles en facteurs
+data$Exited <- as.factor(data$Exited)
+data$Gender <- as.factor(data$Gender)
+
+# Créer un tableau de fréquence pour la variable Exited par sexe
+freq_table <- table(data$Exited, data$Gender)
+
+# Convertir en data.frame pour plotly
+freq_df <- as.data.frame(freq_table)
+colnames(freq_df) <- c("Exited", "Gender", "Count")
+
+# Séparer les données par sexe
+freq_male <- freq_df[freq_df$Gender == "Male", ]
+freq_female <- freq_df[freq_df$Gender == "Female", ]
+
+# Créer deux graphiques en secteur, un pour chaque sexe
+fig_male <- plot_ly(freq_male, labels = ~Exited, values = ~Count, type = 'pie', 
+                    textinfo = 'label+percent', insidetextorientation = 'radial', 
+                    name = "Male", title = "Répartition des Clients Mâles (Partis vs Restés)")
+fig_male
+```
+
+Le graphique montre que, le taux de départ des hommes est de 16.5% soit 898 hommes. tandis que 83.5% sont toujours à la banque.
+
+```{r}
+fig_female <- plot_ly(freq_female, labels = ~Exited, values = ~Count, type = 'pie', 
+                      textinfo = 'label+percent', insidetextorientation = 'radial', 
+                      name = "Female", title = "Répartition des Clients Femelles (Partis vs Restés)")
+fig_female
+```
+Le graphique montre que, le taux de départ des femmes est de 25.1% soit 1139 hommes. tandis que 74.9% sont toujours à la banque.
+Ainsi le taux de départ des femmes(25,1%) soit 1139 femmes est supérieur à celui des hommes( 16%) soit 898 hommes.
+Nous allons chercher à comprendre avec les analyses profond cette tendance.
+
+## 2.3 Analyse des variables démographiques (âge, score de crédit)
+
+- Boxplot pour Age par Exited
+
+```{r}
+
+plot_ly(data, y = ~Age, color = ~Exited, type = 'box') %>%
+  layout(title = "Boxplot de Age par Exited",
+         xaxis = list(title = "Exited"),
+         yaxis = list(title = "Age"),
+         legend = list(title = list(text = "Exited")))
+```
+
+- Boxplot pour CreditScore par Exited
+
+```{r}
+
+plot_ly(data, y = ~CreditScore, color = ~Exited, type = 'box') %>%
+  layout(title = "Boxplot de CreditScore par Exited",
+         xaxis = list(title = "Exited"),
+         yaxis = list(title = "CreditScore"),
+         legend = list(title = list(text = "Exited")))
+```
+- Boxplot pour Balance par Exited
+
+```{r}
+plot_ly(data, y = ~Balance, x = ~Exited, type = 'box',
+                             color = ~Exited,
+                             colors = c("#FF4136", "#2ECC40"),
+                             boxmean = TRUE, # Afficher la moyenne sur le boxplot
+                             text = ~paste("Balance: ", Balance, "<br>Exited: ", Exited)) %>%
+  layout(title = "Boxplot de Balance par Exited",
+         xaxis = list(title = "Exited", categoryorder = "array", categoryarray = c("0", "1")),
+         yaxis = list(title = "Balance"),
+         legend = list(title = list(text = "Exited")))
+```
+
+
+
+## 2.4 Analyse de l'engagement des clients et de l'utilisation des produits bancaires
+
+-  Histogrammes empilés pour NumOfProducts par Exited
+
+```{r}
+num_products_percent <- calculate_percentages(data, NumOfProducts)
+
+plot_ly(num_products_percent, x = ~NumOfProducts, y = ~percent, color = ~Exited, type = 'bar', 
+                           text = ~paste0("Count: ", count, "<br>Percent: ", round(percent, 2), '%'), 
+                           textposition = 'auto') %>%
+  layout(barmode = 'stack',
+         title = "Pourcentage de NumOfProducts par Exited",
+         xaxis = list(title = "NumOfProducts"),
+         yaxis = list(title = "Pourcentage"),
+         legend = list(title = list(text = "Exited")))
+```
+
+- **Clients avec un seul produit :** Il semble y avoir une proportion peu élevée(27,71%) de clients ayant un seul produit qui ont décidé de partir.
+- **Clients avec deux produits :** Nous avons une proportion faible(7,58%) de clients ayant 2 produits qui ont décidé de partir.
+- **Clients avec 3 ou 4 produits :** Nous avons une proportion élevée (82,71%) de clients ayant 3 produits qui ont décidé de partir.Aussi une proportions très élevée (100%) de clients ayant 4 qui ont décidé de partir soit 60 personnes
+
+
+Nous pouvons peut-être remarqué que le taux de churn est dû au nombre de produit que possède un client.Il serait intéressant d'analyser les raisons spécifiques qui poussent les clients ayant plusieurs produit à partir. Des enquêtes de satisfaction client pourraient apporter des éclairages sur ce point.
+
+
+
+
+
+
+
+-  Histogrammes empilés pour  HasCrCard par Exited
+
+```{r}
+has_cr_card_percent <- calculate_percentages(data, HasCrCard)
+
+plot_ly(has_cr_card_percent, x = ~HasCrCard, y = ~percent, color = ~Exited, type = 'bar', 
+                          text = ~paste0("Total: ", count, "<br>Pourcentage: ", round(percent, 2), '%'), 
+                          textposition = 'auto') %>%
+  layout(barmode = 'stack',
+         title = "Pourcentage de HasCrCard par Exited",
+         xaxis = list(title = "HasCrCard"),
+         yaxis = list(title = "Pourcentage"),
+         legend = list(title = list(text = "Exited")))
+```
+
+Pas de différence significative: Le graphique indique qu'il n'y a pas de différence significative entre les clients possédant une carte de crédit et ceux qui n'en possèdent pas en termes de taux de départ. Les deux barres sont presque identiques en hauteur et en proportion de couleurs.La possession d'une carte de crédit ne semble pas être un facteur déterminant dans la décision de quitter la banque. 
+
+
+-  Histogrammes empilés pour  IsActiveMember par Exited
+
+```{r}
+is_active_member_percent <- calculate_percentages(data, IsActiveMember)
+
+plot_ly(is_active_member_percent, x = ~IsActiveMember, y = ~percent, color = ~Exited, type = 'bar', 
+                               text = ~paste0("Count: ", count, "<br>Percent: ", round(percent, 2), '%'), 
+                               textposition = 'auto') %>%
+  layout(barmode = 'stack',
+         title = "Pourcentage de IsActiveMember par Exited",
+         xaxis = list(title = "IsActiveMember"),
+         yaxis = list(title = "Pourcentage"),
+         legend = list(title = list(text = "Exited")))
+```
+
+Le graphique indique qu'il 'y a une légère différence entre les membres actifs(14%) et les membres non actifs (26,85%) en termes de taux de départ. 
+
+
+## 2.5 Visualisation 3D
+
+```{r}
+# Convertir les variables catégorielles en facteurs
+data$Exited <- as.factor(data$Exited)
+data$Geography <- as.factor(data$Geography)
+data$Gender <- as.factor(data$Gender)
+data$HasCrCard <- as.factor(data$HasCrCard)
+data$IsActiveMember <- as.factor(data$IsActiveMember)
+
+# Créer un graphique 3D interactif
+fig <- plot_ly(data, x = ~Age, y = ~CreditScore, z = ~Balance, color = ~Exited, colors = c('#FF0000', '#0000FF')) %>%
+  add_markers() %>%
+  layout(scene = list(xaxis = list(title = 'Âge'),
+                      yaxis = list(title = 'Score de Crédit'),
+                      zaxis = list(title = 'Solde')),
+         title = "Visualisation 3D de l'Abandon des Clients")
+
+# Afficher le graphique
+fig
+
+
+```
+
+Ce graphique interactif en 3D nous permettra de montrer des tendances et des relations complexes entre différentes variables
+ 
+
+## 2.6 Arbre de décision
+
+Ce graphique permet de créer un arbre de décision pour prédire si un client va quitter la banque en fonction de diverses caractéristiques. Les nœuds de l'arbre montreront les différentes conditions et les feuilles indiqueront les prédictions de la variable **Exited**.
+
+```{r}
+
+# Charger les bibliothèques nécessaires
+library(rpart)
+library(rpart.plot)
+library(readr)
+# Convertir les variables catégorielles en facteurs
+data$Exited <- as.factor(data$Exited)
+data$Geography <- as.factor(data$Geography)
+data$Gender <- as.factor(data$Gender)
+data$HasCrCard <- as.factor(data$HasCrCard)
+data$IsActiveMember <- as.factor(data$IsActiveMember)
+
+# Créer l'arbre de décision
+arbre_modele <- rpart(Exited ~ CreditScore + Geography + Gender + Age + Tenure + Balance + NumOfProducts + HasCrCard + IsActiveMember + EstimatedSalary, 
+                      data = data, 
+                      method = "class")
+
+# Visualiser l'arbre de décision
+rpart.plot(arbre_modele, type = 3, extra = 104, fallen.leaves = TRUE, main = "Arbre de Décision pour la Prédiction de l'Abandon des Clients")
+
+
+```
+
+
+# 3. Recommandations Stratégiques
+- **Compréhension des besoins des clients :** Utilisez les données pour mieux comprendre les segments de clients qui sont plus susceptibles de quitter la banque. Analysez les comportements des clients, leurs préférences et leurs interactions avec les produits et services bancaires.
+- **Personnalisation des services :** Proposez des produits et services personnalisés qui répondent aux besoins spécifiques des clients identifiés comme étant à risque de départ. Cela pourrait inclure des offres spéciales, des avantages exclusifs, ou des services de conseil personnalisés.
+- **Utilisation de la technologie et des analyses prédictives :** Implémentez des outils d'analyse avancés pour prédire quels clients sont à risque de quitter et comprendre les facteurs qui influencent leur décision. Utilisez ces insights pour cibler des interventions spécifiques et opportunes.
+- 
+
+
+# 4. Conclusion
+
+Nous espérons que cette analyse fournira des éclaircissements précieux et des pistes d'action concrètes pour renforcer la fidélité de votre clientèle. Votre participation et vos retours seront essentiels pour affiner notre approche et mettre en œuvre des stratégies efficaces. Merci de votre attention, et je suis impatient de partager avec vous nos découvertes et d'échanger sur les prochaines étapes.
+
